@@ -76,6 +76,14 @@ class arObjectCache {
 	public static function purge(ActiveRecord $object) {
 		unset(self::$cache[get_class($object)][$object->getPrimaryFieldValue()]);
 	}
+
+    /**
+     * @param ActiveRecord $object
+     */
+    public static function purgeAll(ActiveRecord $object) {
+        unset(self::$cache[get_class($object)]);
+
+    }
 }
 
 ?>
