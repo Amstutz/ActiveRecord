@@ -5,7 +5,7 @@ require_once(dirname(__FILE__) . '/../Statement/class.arStatement.php');
  * Class arWhere
  *
  * @author  Fabian Schmid <fs@studer-raimann.ch>
- * @version 2.0.6
+ * @version 2.0.7
  */
 class arWhere extends arStatement {
 
@@ -42,14 +42,25 @@ class arWhere extends arStatement {
 	 *
 	 * @param ActiveRecord $ar
 	 *
+	 * @throws arException
 	 * @return string
 	 */
 	public function asSQLStatement(ActiveRecord $ar) {
 		if ($this->getType() == self::TYPE_REGULAR) {
-			$type = $ar->getArFieldList()->getFieldByName($this->getFieldname())->getFieldType();
-			$statement = $ar->getConnectorContainerName() . '.' . $this->getFieldname();
+			$arField = $ar->getArFieldList()->getFieldByName($this->getFieldname());
+			if ($arField instanceof arField) {
+				$type = $arField->getFieldType();
+				$statement = $ar->getConnectorContainerName() . '.' . $this->getFieldname();
+			} else {
+				$statement = $this->getFieldname();
+			}
+
 			if (is_array($this->getValue())) {
-				$statement .= ' IN(';
+				if (in_array($this->getOperator(), array( 'IN', 'NOT IN', 'NOTIN' ))) {
+					$statement .= ' ' . $this->getOperator() . ' (';
+				} else {
+					$statement .= ' IN (';
+				}
 				$values = array();
 				foreach ($this->getValue() as $value) {
 					$values[] = $ar->getArConnector()->quote($value, $type);
@@ -57,6 +68,9 @@ class arWhere extends arStatement {
 				$statement .= implode(', ', $values);
 				$statement .= ')';
 			} else {
+				if ($this->getValue() === NULL) {
+					$this->setOperator('IS');
+				}
 				$statement .= ' ' . $this->getOperator();
 				$statement .= ' ' . $ar->getArConnector()->quote($this->getValue(), $type);
 			}

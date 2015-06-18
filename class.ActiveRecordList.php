@@ -3,6 +3,8 @@ require_once(dirname(__FILE__) . '/Connector/Join/class.arJoinCollection.php');
 require_once(dirname(__FILE__) . '/Connector/Where/class.arWhereCollection.php');
 require_once(dirname(__FILE__) . '/Connector/Limit/class.arLimitCollection.php');
 require_once(dirname(__FILE__) . '/Connector/Order/class.arOrderCollection.php');
+require_once(dirname(__FILE__) . '/Connector/Concat/class.arConcatCollection.php');
+require_once(dirname(__FILE__) . '/Connector/Select/class.arSelectCollection.php');
 
 /**
  * Class ActiveRecordList
@@ -12,7 +14,7 @@ require_once(dirname(__FILE__) . '/Connector/Order/class.arOrderCollection.php')
  *
  * @description
  *
- * @version 2.0.6
+ * @version 2.0.7
  */
 class ActiveRecordList {
 
@@ -32,6 +34,14 @@ class ActiveRecordList {
 	 * @var arLimitCollection
 	 */
 	protected $arLimitCollection;
+	/**
+	 * @var arConcatCollection
+	 */
+	protected $arConcatCollection;
+	/**
+	 * @var arSelectCollection
+	 */
+	protected $arSelectCollection;
 	/**
 	 * @var bool
 	 */
@@ -88,11 +98,26 @@ class ActiveRecordList {
 		$this->arJoinCollection = arJoinCollection::getInstance($this->getAR());
 		$this->arLimitCollection = arLimitCollection::getInstance($this->getAR());
 		$this->arOrderCollection = arOrderCollection::getInstance($this->getAR());
-		if ($ar->getArConnector() == NULL) {
-			$this->connector = new arConnectorDB($this);
-		} else {
-			$this->connector = $ar->getArConnector();
-		}
+		$this->arConcatCollection = arConcatCollection::getInstance($this->getAR());
+		$this->arSelectCollection = arSelectCollection::getInstance($this->getAR());
+
+		$arSelect = new arSelect();
+		$arSelect->setTableName($ar->getConnectorContainerName());
+		$arSelect->setFieldName('*');
+		$this->getArSelectCollection()->add($arSelect);
+//		if ($ar->getArConnector() == NULL) {
+//			$this->connector = new arConnectorDB($this);
+//		} else {
+//			$this->connector = $ar->getArConnector();
+//		}
+	}
+
+
+	/**
+	 * @return arConnector
+	 */
+	protected function getArConnector() {
+		return arConnectorMap::get($this->getAR());
 	}
 
 	//
@@ -160,7 +185,7 @@ class ActiveRecordList {
 	 * @throws arException
 	 */
 	public function orderBy($order_by, $order_direction = 'ASC') {
-		if (! $this->getAR()->getArFieldList()->isField($order_by)) {
+		if (!$this->getAR()->getArFieldList()->isField($order_by)) {
 			//			throw new arException(arException::LIST_ORDER_BY_WRONG_FIELD, $order_by); // Due to Bugfix with Joins
 		}
 		$arOrder = new arOrder();
@@ -219,7 +244,7 @@ class ActiveRecordList {
 	 */
 
 	protected function join($type = arJoin::TYPE_INNER, $tablename, $on_this, $on_external, $fields = array( '*' ), $operator = '=', $both_external = false) {
-		if (! $this->getAR()->getArFieldList()->isField($on_this) && !$both_external) {
+		if (!$this->getAR()->getArFieldList()->isField($on_this) AND !$both_external) {
 			throw new arException(arException::LIST_JOIN_ON_WRONG_FIELD, $on_this);
 		}
 		$full_names = false;
@@ -239,8 +264,15 @@ class ActiveRecordList {
 		$arJoin->setOperator($operator);
 		$arJoin->setFields($fields);
 		$arJoin->setBothExternal($both_external);
-
 		$this->getArJoinCollection()->add($arJoin);
+
+		foreach ($fields as $field) {
+			$arSelect = new arSelect();
+			$arSelect->setTableName($arJoin->getTableNameAs());
+			$arSelect->setFieldName($field);
+			$arSelect->setAs($arJoin->getTableNameAs() . '_' . $field);
+			$this->getArSelectCollection()->add($arSelect);
+		}
 
 		return $this;
 	}
@@ -275,6 +307,22 @@ class ActiveRecordList {
 	 */
 	public function innerjoin($tablename, $on_this, $on_external, $fields = array( '*' ), $operator = '=', $both_external = false) {
 		return $this->join(arJoin::TYPE_INNER, $tablename, $on_this, $on_external, $fields, $operator, $both_external);
+	}
+
+
+	/**
+	 * @param array $fields
+	 * @param       $as
+	 *
+	 * @return $this
+	 */
+	public function concat(array $fields, $as) {
+		$con = new arConcat();
+		$con->setAs($as);
+		$con->setFields($fields);
+		$this->getArConcatCollection()->add($con);
+
+		return $this;
 	}
 
 	//
@@ -312,6 +360,24 @@ class ActiveRecordList {
 		return $this->arLimitCollection;
 	}
 
+
+	/**
+	 * @return arConcatCollection
+	 */
+	public function getArConcatCollection() {
+		return $this->arConcatCollection;
+	}
+
+
+	/**
+	 * @return arSelectCollection
+	 */
+	public function getArSelectCollection() {
+		return $this->arSelectCollection;
+	}
+
+
+
 	//
 	// Collection Functions
 	//
@@ -329,10 +395,10 @@ class ActiveRecordList {
 	}
 
 
-    /**
-     * @return $this
-     */
-    public function debug() {
+	/**
+	 * @return $this
+	 */
+	public function debug() {
 		$this->loaded = false;
 		$this->debug = true;
 
@@ -376,7 +442,7 @@ class ActiveRecordList {
 	 * @return int
 	 */
 	public function affectedRows() {
-		return $this->connector->affectedRows($this);
+		return $this->getArConnector()->affectedRows($this);
 	}
 
 
@@ -457,8 +523,6 @@ class ActiveRecordList {
 	 * @param string       $key    shall a specific value be used as a key? if null then the 1. array key is just increasing from 0.
 	 * @param string|array $values which values should be taken? if null all are given. If only a string is given then the result is an 1D array!
 	 *
-	 * @internal param bool $array_only
-	 *
 	 * @return array
 	 */
 	public function getArray($key = NULL, $values = NULL) {
@@ -482,7 +546,7 @@ class ActiveRecordList {
 		$array = array();
 		foreach ($this->result_array as $row) {
 			if ($key) {
-				if (! array_key_exists($key, $row)) {
+				if (!array_key_exists($key, $row)) {
 					throw new Exception("The attribute $key does not exist on this model.");
 				}
 				$array[$row[$key]] = $this->buildRow($row, $values);
@@ -506,7 +570,7 @@ class ActiveRecordList {
 			return $row;
 		} else {
 			$array = array();
-			if (! is_array($values)) {
+			if (!is_array($values)) {
 				return $row[$values];
 			}
 			foreach ($row as $key => $value) {
@@ -524,22 +588,24 @@ class ActiveRecordList {
 		if ($this->loaded) {
 			return;
 		} else {
-			$records = $this->connector->readSet($this);
+			$records = $this->getArConnector()->readSet($this);
 			/**
 			 * @var $obj ActiveRecord
 			 */
-			$class = get_class($this->getAR());
-			$obj = arFactory::getInstance($class, NULL, $this->getAddidtionalParameters());
-			$primaryFieldName = $obj->getArFieldList()->getPrimaryFieldName();
-
+//			$class = get_class($this->getAR());
+//			$obj = arFactory::getInstance($class, NULL, $this->getAddidtionalParameters());
+			$primaryFieldName = $this->getAR()->getArFieldList()->getPrimaryFieldName();
+			$class_name = get_class($this->getAR());
 			foreach ($records as $res) {
 				$primary_field_value = $res[$primaryFieldName];
-				if (! $this->getRaw()) {
-					$obj = arFactory::getInstance($class, NULL, $this->getAddidtionalParameters());
+				if (!$this->getRaw()) {
+
+//					$obj = arFactory::getInstance($class_name, NULL, $this->getAddidtionalParameters());
+					$obj = new $class_name(0, $this->getArConnector(), $this->getAddidtionalParameters());
 					$this->result[$primary_field_value] = $obj->buildFromArray($res);
 				}
 				$res_awake = array();
-				if (! $this->getRaw()) {
+				if (!$this->getRaw()) {
 					foreach ($res as $key => $value) {
 						$arField = $obj->getArFieldList()->getFieldByName($key);
 						if ($arField !== NULL) {

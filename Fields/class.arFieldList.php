@@ -6,7 +6,7 @@ require_once('class.arField.php');
  *
  * @author  Fabian Schmid <fs@studer-raimann.ch>
  *
- * @version 2.0.6
+ * @version 2.0.7
  */
 class arFieldList {
 
@@ -165,8 +165,14 @@ class arFieldList {
 	 */
 	public function getFieldByName($field_name) {
 		$field = NULL;
+		static $field_map;
+		if ($field_map[$field_name]) {
+			return $field_map[$field_name];
+		}
 		foreach ($this->getFields() as $field) {
 			if ($field->getName() == $field_name) {
+				$field_map[$field_name] = $field;
+
 				return $field;
 			}
 		}
@@ -254,7 +260,7 @@ class arFieldList {
 	protected static function checkAttributes(array $attributes) {
 		if ($attributes[self::HAS_FIELD] === 'true') {
 			foreach (array_keys($attributes) as $atr) {
-				if (! self::isAllowedAttribute($atr)) {
+				if (!self::isAllowedAttribute($atr)) {
 					return false;
 				}
 			}
