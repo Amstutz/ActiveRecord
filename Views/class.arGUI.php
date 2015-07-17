@@ -100,9 +100,6 @@ class arGUI {
 			$table_gui = new $index_table_gui_class($this, "index", new ActiveRecordList($this->ar));
 		}
 		$this->tpl->setContent($table_gui->getHTML());
-        if(self::isILIASGreater50()){
-            $this->tpl->show();
-        }
 	}
 
 
@@ -173,9 +170,6 @@ class arGUI {
 		 */
 		$edit_gui = new $edit_gui_class($this, $this->ar->find($id));
 		$this->tpl->setContent($edit_gui->getHTML());
-        if(self::isILIASGreater50()){
-            $this->tpl->show();
-        }
 	}
 
 
@@ -221,9 +215,6 @@ class arGUI {
 			$this->ctrl->redirect($this, "index");
 		} else {
 			$this->tpl->setContent($edit_gui->getHTML());
-            if(self::isILIASGreater50()){
-                $this->tpl->show();
-            }
 		}
 	}
 
@@ -246,9 +237,6 @@ class arGUI {
 		 */
 		$display_gui = new $display_gui_class($this, $this->ar->find($id));
 		$this->tpl->setContent($display_gui->getHtml());
-        if(self::isILIASGreater50()){
-            $this->tpl->show();
-        }
 	}
 
 
@@ -275,9 +263,6 @@ class arGUI {
 			ilUtil::sendQuestion($this->getDeleteRecordsConfirmationMessage());
 		}
 		$this->tpl->setContent($delete_gui->getHTML());
-        if(self::isILIASGreater50()){
-            $this->tpl->show();
-        }
 	}
 
 
@@ -359,11 +344,4 @@ class arGUI {
 			return $this->lng->txt($txt);
 		}
 	}
-
-    /**
-     * @return boolean
-     */
-    static function isILIASGreater50(){
-        return ilComponent::isVersionGreaterString(ILIAS_VERSION_NUMERIC, '4.9.999');
-    }
 }
