@@ -739,7 +739,7 @@ abstract class ActiveRecord implements arStorageInterface {
 	/**
 	 * @return ActiveRecord[]
 	 */
-	public static function get() {
+	public static function get($name = "") {
 		$srModelObjectList = new ActiveRecordList(self::getCalledClass());
 
 		return $srModelObjectList->get();
